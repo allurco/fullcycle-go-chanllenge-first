@@ -15,6 +15,9 @@ type Quote struct {
 }
 
 func main() {
+
+	var filename string = "../cotacao.txt"
+
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
@@ -36,24 +39,24 @@ func main() {
 
 	json.Unmarshal(body, &quote)
 
-	if _, err := os.Stat("./cotacao.txt"); err != nil {
+	if _, err := os.Stat(filename); err != nil {
 
-		f, err := os.Create("./cotacao.txt")
+		f, err := os.Create(filename)
 		if err != nil {
 			panic(err)
 		}
 		defer f.Close()
 
-		f.WriteString(fmt.Sprintf("Dolar: %f \n", quote.Bid))
+		f.WriteString(fmt.Sprintf("Dólar: %f \n", quote.Bid))
 
 	} else {
-		f, err := os.OpenFile("./cotacao.txt", os.O_APPEND|os.O_WRONLY, 644)
+		f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 644)
 		if err != nil {
 			panic(err)
 		}
 		defer f.Close()
 
-		f.WriteString(fmt.Sprintf("Dolar: %f \n", quote.Bid))
+		f.WriteString(fmt.Sprintf("Dólar: %f \n", quote.Bid))
 
 	}
 
