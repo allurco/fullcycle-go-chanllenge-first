@@ -110,7 +110,7 @@ func connectToDb() (*sql.DB, error) {
 
 func createTables(db *sql.DB) (string, error) {
 	sqlStmt := `
-	drop table exchange;
+	drop table if exists exchange;
 	create table exchange (id integer not null primary key autoincrement, real_value double(10,2), requested_at timestamp default CURRENT_TIMESTAMP);
 	delete from exchange;
 	`
