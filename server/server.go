@@ -31,6 +31,10 @@ type Usdbrl struct {
 	CreateDate string `json:"create_date"`
 }
 
+type Response struct {
+	Bid float32 `json:"bid"`
+}
+
 func main() {
 	log.Println("Iniciando o Servidor")
 	db, err := connectToDb()
@@ -56,12 +60,20 @@ func main() {
 		bid, err := performTask(ctx, db)
 		if err != nil {
 			log.Println(err)
+			w.Write([]byte("error"))
 			return
 		}
 
-		writeResult := fmt.Sprintf("Deu Certo - %f", bid)
+		var response Response
+		response.Bid = bid
 
-		w.Write([]byte(writeResult))
+		jsonData, err := json.Marshal(response)
+		if err != nil {
+			fmt.Println("Error marshaling JSON:", err)
+			return
+		}
+
+		w.Write([]byte(jsonData))
 	})
 
 	http.ListenAndServe(":8080", nil)
@@ -69,24 +81,22 @@ func main() {
 }
 
 func performTask(ctx context.Context, db *sql.DB) (float32, error) {
-	select {
-	case <-time.After(200 * time.Millisecond):
-		quote, err := getQuote()
-		if err != nil {
-			return 0, err
-		}
-
-		err = saveData(&quote, db)
-		if err != nil {
-			return 0, err
-		}
-
-		bid, err := getLatestQuote(db)
-
-		return bid, nil
-	case <-ctx.Done():
-		return 0, ctx.Err()
+	quote, err := getQuote(ctx)
+	if err != nil {
+		return 0, err
 	}
+
+	err = saveData(&quote, db, ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	bid, err := getLatestQuote(db)
+	if err != nil {
+		return 0, err
+	}
+
+	return bid, nil
 }
 
 func connectToDb() (*sql.DB, error) {
@@ -113,8 +123,8 @@ func createTables(db *sql.DB) (string, error) {
 	return "", nil
 }
 
-func getQuote() (Usdbrl, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+func getQuote(ctx context.Context) (Usdbrl, error) {
+	ctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
@@ -140,27 +150,33 @@ func getQuote() (Usdbrl, error) {
 	return quote.USDBRL, nil
 }
 
-func saveData(quote *Usdbrl, db *sql.DB) error {
-	tx, err := db.Begin()
+func saveData(quote *Usdbrl, db *sql.DB, ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+	defer cancel()
+
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		return err
 	}
-	stmt, err := tx.Prepare("insert into exchange(real_value) values(?)")
+
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, "insert into exchange(real_value) values(?)")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(quote.Bid)
+	_, err = stmt.ExecContext(ctx, quote.Bid)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		return err
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	return nil
@@ -170,7 +186,7 @@ func getLatestQuote(db *sql.DB) (float32, error) {
 
 	stmt, err := db.Prepare("select real_value from exchange order by id desc limit 1")
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 		return 0, err
 	}
 	defer stmt.Close()
