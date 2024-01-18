@@ -52,7 +52,7 @@ func main() {
 	log.Println(results)
 	log.Println("Servidor Iniciado")
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/cotacao", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		log.Println("Request Iniciada")
 		defer log.Println("Request Finalizada")
