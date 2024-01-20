@@ -16,7 +16,7 @@ type Quote struct {
 
 func main() {
 
-	var filename string = "../cotacao.txt"
+	var filename string = "./cotacao.txt"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
